@@ -1,0 +1,25 @@
+{
+  "title": "My Wiki",
+  "tagline": "One-paragraph description of what this wiki is for. Shows on the welcome screen.",
+  "brand": "MW",
+  "featured": [
+    {
+      "tag": "Start here",
+      "title": "Index",
+      "blurb": "The full catalog of pages.",
+      "path": "index"
+    },
+    {
+      "tag": "Synthesis",
+      "title": "Some High-Value Page",
+      "blurb": "Why this page matters, in one short sentence.",
+      "path": "concepts/Some High-Value Page"
+    },
+    {
+      "tag": "Roadmap",
+      "title": "Automations",
+      "blurb": "Ranked list of what to build.",
+      "path": "concepts/automations/index"
+    }
+  ]
+}
