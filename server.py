@@ -93,9 +93,9 @@ class WikiPaths:
     wiki: Path
     audit: Path
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, wiki_dir: Path = None):
         self.root = root
-        self.wiki = root / "wiki"
+        self.wiki = wiki_dir if wiki_dir is not None else (root / "wiki")
         self.audit = root / "audit"
 
 
@@ -193,7 +193,10 @@ def list_fs_dir(dir_path_str: str) -> dict:
         for e in sorted(dir_path.iterdir(), key=lambda x: x.name.lower()):
             if e.name.startswith(".") or not e.is_dir():
                 continue
-            is_wiki = (e / "wiki").is_dir()
+            is_wiki = (
+                ((e / "wiki").is_dir() and (e / "wiki" / "index.md").is_file())
+                or (e / "index.md").is_file()
+            )
             entries.append({"name": e.name, "path": str(e), "is_wiki": is_wiki})
     except PermissionError:
         pass
@@ -211,11 +214,22 @@ def open_wiki(path_str: str) -> dict:
         return {"ok": False, "error": str(e)}
     if not p.is_dir():
         return {"ok": False, "error": "path does not exist or is not a directory"}
-    if not (p / "wiki").is_dir():
-        return {"ok": False, "error": "no wiki/ subdirectory — not a valid wiki root"}
-    PATHS = WikiPaths(p)
-    save_recent(p)
-    return {"ok": True, "path": str(p)}
+    # Case A: standard llm-wiki layout — has wiki/index.md
+    if (p / "wiki").is_dir() and (p / "wiki" / "index.md").is_file():
+        PATHS = WikiPaths(p)
+        save_recent(p)
+        return {"ok": True, "path": str(p)}
+    # Case B: p IS the wiki directory (has index.md directly)
+    if (p / "index.md").is_file():
+        PATHS = WikiPaths(p.parent, wiki_dir=p)
+        save_recent(p)
+        return {"ok": True, "path": str(p)}
+    # Case C: has wiki/ but no index.md — still usable
+    if (p / "wiki").is_dir():
+        PATHS = WikiPaths(p)
+        save_recent(p)
+        return {"ok": True, "path": str(p)}
+    return {"ok": False, "error": "not a valid wiki root — needs wiki/index.md or index.md"}
 
 
 # ============================================================
@@ -577,7 +591,11 @@ class Handler(BaseHTTPRequestHandler):
                 result.append({
                     "path": r,
                     "name": p.name,
-                    "valid": p.is_dir() and (p / "wiki").is_dir(),
+                    "valid": p.is_dir() and (
+                        ((p / "wiki").is_dir() and (p / "wiki" / "index.md").is_file())
+                        or (p / "index.md").is_file()
+                        or (p / "wiki").is_dir()
+                    ),
                 })
             self._send_json(200, result)
             return
@@ -692,15 +710,10 @@ def main():
 
     global PATHS
     if wiki_root_arg:
-        wiki_root = Path(wiki_root_arg).resolve()
-        if not wiki_root.exists():
-            print(f"ERROR: wiki root does not exist: {wiki_root}", file=sys.stderr)
+        result = open_wiki(wiki_root_arg)
+        if not result.get("ok"):
+            print(f"ERROR: {result['error']}", file=sys.stderr)
             sys.exit(2)
-        if not (wiki_root / "wiki").exists():
-            print(f"ERROR: no wiki/ subdirectory at: {wiki_root}", file=sys.stderr)
-            sys.exit(2)
-        PATHS = WikiPaths(wiki_root)
-        save_recent(wiki_root)
 
     lan_ip = detect_lan_ip()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
