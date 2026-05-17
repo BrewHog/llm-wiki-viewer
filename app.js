@@ -16,6 +16,8 @@ const state = {
   fsCurrentPath: null,
   fsParent: null,
   fsSelectedPath: null,
+  wikiPath: null,
+  bookmarkedPaths: new Set(),
 };
 
 const els = {
@@ -60,7 +62,10 @@ const els = {
   inboxList: document.getElementById("inbox-list"),
   inboxFilterRow: document.getElementById("inbox-filter-row"),
   openWikiBtn: document.getElementById("open-wiki-btn"),
+  bookmarkBtn: document.getElementById("bookmark-btn"),
   picker: document.getElementById("picker"),
+  pickerBookmarksSection: document.getElementById("picker-bookmarks-section"),
+  pickerBookmarks: document.getElementById("picker-bookmarks"),
   pickerRecentsSection: document.getElementById("picker-recents-section"),
   pickerRecents: document.getElementById("picker-recents"),
   pickerBreadcrumb: document.getElementById("picker-breadcrumb"),
@@ -397,7 +402,10 @@ function renderError(msg) {
 // ============================================================
 function preprocess(md) {
   md = md.replace(/```mermaid\n([\s\S]*?)```/g, (m, body) => {
-    const attrSafe = body.trim().replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const attrSafe = body.trim()
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/\n/g, "&#10;");
     return `<div class="mermaid" data-mermaid-source="${attrSafe}"></div>`;
   });
   md = md.replace(/\[\[([^\]]+)\]\]/g, (match, raw) => {
@@ -851,6 +859,111 @@ function toggleSidebar() {
 }
 
 // ============================================================
+// bookmarks
+// ============================================================
+async function refreshBookmarks() {
+  try {
+    const res = await fetch("/api/bookmarks");
+    const data = await res.json();
+    state.bookmarkedPaths = new Set(data.map((b) => b.path));
+    return data;
+  } catch (_) {
+    state.bookmarkedPaths = new Set();
+    return [];
+  }
+}
+
+async function toggleBookmark(path) {
+  const isBookmarked = state.bookmarkedPaths.has(path);
+  try {
+    await fetch(isBookmarked ? "/api/unbookmark" : "/api/bookmark", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    if (isBookmarked) state.bookmarkedPaths.delete(path);
+    else state.bookmarkedPaths.add(path);
+  } catch (_) {}
+}
+
+const STAR_OUTLINE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+const STAR_FILLED = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+const STAR_OUTLINE_SM = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+const STAR_FILLED_SM = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+
+function updateBookmarkBtn() {
+  if (!els.bookmarkBtn || !state.wikiPath) return;
+  const isBookmarked = state.bookmarkedPaths.has(state.wikiPath);
+  els.bookmarkBtn.classList.toggle("icon-btn--active", isBookmarked);
+  els.bookmarkBtn.title = isBookmarked ? "Remove bookmark" : "Bookmark this wiki";
+  els.bookmarkBtn.innerHTML = isBookmarked ? STAR_FILLED : STAR_OUTLINE;
+}
+
+function renderPickerBookmarks(bookmarks) {
+  const valid = bookmarks.filter((b) => b.valid);
+  if (!valid.length) {
+    els.pickerBookmarksSection.hidden = true;
+    return;
+  }
+  els.pickerBookmarks.innerHTML = "";
+  valid.forEach((b) => {
+    const row = document.createElement("div");
+    row.className = "picker-bookmark-item";
+    row.innerHTML = `
+      <div class="picker-bookmark-main">
+        ${STAR_FILLED_SM}
+        <span class="picker-recent-name">${escapeHtml(b.name)}</span>
+        <span class="picker-recent-path">${escapeHtml(b.path)}</span>
+      </div>
+      <button class="picker-item-star picker-item-star--active" title="Remove bookmark">${STAR_FILLED_SM}</button>
+    `;
+    row.querySelector(".picker-bookmark-main").addEventListener("click", () => doOpenWiki(b.path));
+    row.querySelector(".picker-item-star").addEventListener("click", async () => {
+      await toggleBookmark(b.path);
+      const data = await refreshBookmarks();
+      renderPickerBookmarks(data);
+      renderPickerRecents(await fetch("/api/recents").then((r) => r.json()));
+    });
+    els.pickerBookmarks.appendChild(row);
+  });
+  els.pickerBookmarksSection.hidden = false;
+}
+
+function renderPickerRecents(recents) {
+  const valid = recents.filter((r) => r.valid);
+  if (!valid.length) {
+    els.pickerRecentsSection.hidden = true;
+    return;
+  }
+  els.pickerRecents.innerHTML = "";
+  valid.forEach((r) => {
+    const isBookmarked = state.bookmarkedPaths.has(r.path);
+    const row = document.createElement("div");
+    row.className = "picker-recent-item";
+    row.innerHTML = `
+      <div class="picker-recent-main">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span class="picker-recent-name">${escapeHtml(r.name)}</span>
+        <span class="picker-recent-path">${escapeHtml(r.path)}</span>
+      </div>
+      <button class="picker-item-star${isBookmarked ? " picker-item-star--active" : ""}" title="${isBookmarked ? "Remove bookmark" : "Bookmark"}">${isBookmarked ? STAR_FILLED_SM : STAR_OUTLINE_SM}</button>
+    `;
+    row.querySelector(".picker-recent-main").addEventListener("click", () => doOpenWiki(r.path));
+    row.querySelector(".picker-item-star").addEventListener("click", async () => {
+      await toggleBookmark(r.path);
+      const [bookmarkData, recentsData] = await Promise.all([
+        refreshBookmarks(),
+        fetch("/api/recents").then((res) => res.json()),
+      ]);
+      renderPickerBookmarks(bookmarkData);
+      renderPickerRecents(recentsData);
+    });
+    els.pickerRecents.appendChild(row);
+  });
+  els.pickerRecentsSection.hidden = false;
+}
+
+// ============================================================
 // wiki picker
 // ============================================================
 function showPicker() {
@@ -868,33 +981,16 @@ function hidePicker() {
 
 async function openPicker() {
   showPicker();
-  // Load recents and starting directory in parallel
-  const [, fsData] = await Promise.all([loadPickerRecents(), fetchFs(state.fsCurrentPath)]);
+  // Bookmarks must load before recents (recents rendering reads state.bookmarkedPaths)
+  const [bookmarkData, fsData] = await Promise.all([
+    refreshBookmarks(),
+    fetchFs(state.fsCurrentPath),
+  ]);
+  renderPickerBookmarks(bookmarkData);
   renderFsEntries(fsData);
-}
-
-async function loadPickerRecents() {
   try {
-    const res = await fetch("/api/recents");
-    const recents = await res.json();
-    const valid = recents.filter((r) => r.valid);
-    if (!valid.length) {
-      els.pickerRecentsSection.hidden = true;
-      return;
-    }
-    els.pickerRecents.innerHTML = "";
-    valid.forEach((r) => {
-      const btn = document.createElement("button");
-      btn.className = "picker-recent-item";
-      btn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        <span class="picker-recent-name">${escapeHtml(r.name)}</span>
-        <span class="picker-recent-path">${escapeHtml(r.path)}</span>
-      `;
-      btn.addEventListener("click", () => doOpenWiki(r.path));
-      els.pickerRecents.appendChild(btn);
-    });
-    els.pickerRecentsSection.hidden = false;
+    const recentsData = await fetch("/api/recents").then((r) => r.json());
+    renderPickerRecents(recentsData);
   } catch (_) {}
 }
 
@@ -1056,6 +1152,11 @@ async function init() {
 
   els.hamburger.addEventListener("click", toggleSidebar);
   els.openWikiBtn.addEventListener("click", openPicker);
+  els.bookmarkBtn.addEventListener("click", async () => {
+    if (!state.wikiPath) return;
+    await toggleBookmark(state.wikiPath);
+    updateBookmarkBtn();
+  });
 
   // Picker interactions
   els.pickerUpBtn.addEventListener("click", () => {
@@ -1173,10 +1274,13 @@ async function init() {
       openPicker();
       return;
     }
+    state.wikiPath = health.wiki_open_path;
+    els.bookmarkBtn.hidden = false;
   } catch (_) {}
 
   // Wiki is loaded — normal init
-  await Promise.all([loadWelcome(), loadTree()]);
+  await Promise.all([loadWelcome(), loadTree(), refreshBookmarks()]);
+  updateBookmarkBtn();
   const params = new URLSearchParams(window.location.search);
   const p = params.get("p");
   if (p) loadPage(p);

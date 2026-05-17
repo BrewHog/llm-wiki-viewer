@@ -119,6 +119,8 @@ button { font-family: inherit; cursor: pointer; }
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+.icon-btn--active { color: var(--warn); }
+.icon-btn--active:hover { background: rgba(184, 133, 0, 0.1); color: var(--warn); }
 
 .sidebar-search {
   padding: 0 12px 8px;
@@ -914,6 +916,38 @@ mark.search-mark {
   margin-bottom: 10px;
 }
 
+/* bookmarks */
+.picker-bookmarks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.picker-bookmark-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.12s, box-shadow 0.12s;
+  overflow: hidden;
+}
+.picker-bookmark-item:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.picker-bookmark-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.picker-bookmark-main svg { color: var(--warn); flex-shrink: 0; }
+
 /* recent wikis */
 .picker-recents {
   display: flex;
@@ -923,22 +957,28 @@ mark.search-mark {
 .picker-recent-item {
   display: flex;
   align-items: center;
-  gap: 10px;
   width: 100%;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 14px;
-  cursor: pointer;
-  text-align: left;
   transition: border-color 0.12s, box-shadow 0.12s;
-  font-family: inherit;
+  overflow: hidden;
 }
 .picker-recent-item:hover {
   border-color: var(--accent);
   box-shadow: var(--shadow-sm);
 }
-.picker-recent-item svg { color: var(--accent); flex-shrink: 0; }
+.picker-recent-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.picker-recent-main svg { color: var(--accent); flex-shrink: 0; }
 .picker-recent-name {
   font-size: 14px;
   font-weight: 500;
@@ -954,6 +994,26 @@ mark.search-mark {
   flex: 1;
   min-width: 0;
 }
+
+/* star button used in picker rows */
+.picker-item-star {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  width: 32px;
+  height: 32px;
+  margin: 0 6px;
+  border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+.picker-item-star:hover { color: var(--warn); background: rgba(184, 133, 0, 0.08); }
+.picker-item-star--active { color: var(--warn); }
+.picker-item-star--active:hover { color: var(--error); background: rgba(183, 58, 58, 0.08); }
 
 /* filesystem browser */
 .picker-path-bar {

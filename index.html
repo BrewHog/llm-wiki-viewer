@@ -23,6 +23,9 @@
         <button class="icon-btn" id="open-wiki-btn" title="Open a different wiki" aria-label="Open wiki">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </button>
+        <button class="icon-btn" id="bookmark-btn" title="Bookmark this wiki" aria-label="Bookmark this wiki" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
         <button class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         </button>
@@ -71,6 +74,11 @@
     <div class="picker" id="picker" hidden>
       <div class="picker-inner">
         <h1 class="picker-heading">Open a wiki</h1>
+
+        <div class="picker-section" id="picker-bookmarks-section" hidden>
+          <div class="picker-section-label">Bookmarks</div>
+          <div class="picker-bookmarks" id="picker-bookmarks"></div>
+        </div>
 
         <div class="picker-section" id="picker-recents-section" hidden>
           <div class="picker-section-label">Recent</div>

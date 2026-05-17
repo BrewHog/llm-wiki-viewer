@@ -17,17 +17,17 @@ sequenceDiagram
     participant U as Reader
     participant B as Browser
     participant S as server.py
-    participant D as audit/ disk
+    participant D as audit dir
 
     U->>B: selects text in article
     B->>B: onSelectionChange() — show toolbar
     U->>B: clicks "Add feedback"
     B->>B: openAuditModal() — anchor extraction
     U->>B: sets severity, name, comment → "File feedback"
-    B->>S: POST /api/audit {target, anchor_text, anchor_before, anchor_after, severity, author, comment}
+    B->>S: POST /api/audit with target, anchor, severity, author, comment
     S->>S: validate anchor_text exists in target file
-    S->>D: write audit/YYYYMMDD-HHMMSS-<slug>.md
-    S-->>B: {ok: true, id: "..."}
+    S->>D: write YYYYMMDD-HHMMSS-slug.md
+    S-->>B: ok: true, id
     B->>B: showToast, clear selection
 ```
 

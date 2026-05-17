@@ -66,6 +66,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 RECENTS_FILE = Path.home() / ".llm-wiki-viewer-recents.json"
+BOOKMARKS_FILE = Path.home() / ".llm-wiki-viewer-bookmarks.json"
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
@@ -93,10 +94,11 @@ class WikiPaths:
     wiki: Path
     audit: Path
 
-    def __init__(self, root: Path, wiki_dir: Path = None):
+    def __init__(self, root: Path, wiki_dir: Path = None, open_path: Path = None):
         self.root = root
         self.wiki = wiki_dir if wiki_dir is not None else (root / "wiki")
         self.audit = root / "audit"
+        self.open_path = open_path if open_path is not None else root
 
 
 PATHS = None  # WikiPaths | None; set by open_wiki() or main()
@@ -181,6 +183,21 @@ def save_recent(path: Path) -> None:
         pass
 
 
+def load_bookmarks() -> list:
+    try:
+        data = json.loads(BOOKMARKS_FILE.read_text(encoding="utf-8"))
+        return [r for r in data if isinstance(r, str)]
+    except Exception:
+        return []
+
+
+def save_bookmarks(paths: list) -> None:
+    try:
+        BOOKMARKS_FILE.write_text(json.dumps(paths), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def list_fs_dir(dir_path_str: str) -> dict:
     try:
         dir_path = Path(dir_path_str).resolve()
@@ -216,17 +233,17 @@ def open_wiki(path_str: str) -> dict:
         return {"ok": False, "error": "path does not exist or is not a directory"}
     # Case A: standard llm-wiki layout — has wiki/index.md
     if (p / "wiki").is_dir() and (p / "wiki" / "index.md").is_file():
-        PATHS = WikiPaths(p)
+        PATHS = WikiPaths(p, open_path=p)
         save_recent(p)
         return {"ok": True, "path": str(p)}
     # Case B: p IS the wiki directory (has index.md directly)
     if (p / "index.md").is_file():
-        PATHS = WikiPaths(p.parent, wiki_dir=p)
+        PATHS = WikiPaths(p.parent, wiki_dir=p, open_path=p)
         save_recent(p)
         return {"ok": True, "path": str(p)}
     # Case C: has wiki/ but no index.md — still usable
     if (p / "wiki").is_dir():
-        PATHS = WikiPaths(p)
+        PATHS = WikiPaths(p, open_path=p)
         save_recent(p)
         return {"ok": True, "path": str(p)}
     return {"ok": False, "error": "not a valid wiki root — needs wiki/index.md or index.md"}
@@ -570,6 +587,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "has_wiki": PATHS is not None,
                 "wiki_root": str(PATHS.root) if PATHS else None,
+                "wiki_open_path": str(PATHS.open_path) if PATHS else None,
                 "wiki_exists": PATHS.wiki.exists() if PATHS else False,
             })
             return
@@ -596,6 +614,19 @@ class Handler(BaseHTTPRequestHandler):
                         or (p / "index.md").is_file()
                         or (p / "wiki").is_dir()
                     ),
+                })
+            self._send_json(200, result)
+            return
+
+        if path == "/api/bookmarks":
+            bookmarks = load_bookmarks()
+            result = []
+            for b in bookmarks:
+                bp = Path(b)
+                result.append({
+                    "path": b,
+                    "name": bp.name,
+                    "valid": bp.is_dir(),
                 })
             self._send_json(200, result)
             return
@@ -672,6 +703,25 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/open":
             result = open_wiki(payload.get("path", ""))
             self._send_json(200 if result.get("ok") else 400, result)
+            return
+
+        if self.path == "/api/bookmark":
+            path_str = payload.get("path", "")
+            if not path_str:
+                self._send_json(400, {"ok": False, "error": "no path"})
+                return
+            bookmarks = load_bookmarks()
+            if path_str not in bookmarks:
+                bookmarks.append(path_str)
+                save_bookmarks(bookmarks)
+            self._send_json(200, {"ok": True})
+            return
+
+        if self.path == "/api/unbookmark":
+            path_str = payload.get("path", "")
+            bookmarks = [b for b in load_bookmarks() if b != path_str]
+            save_bookmarks(bookmarks)
+            self._send_json(200, {"ok": True})
             return
 
         if self.path == "/api/audit":
