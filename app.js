@@ -230,7 +230,7 @@ function makeFolder(folder, depth) {
   });
 
   const inner = document.createElement("div");
-  inner.className = depth > 0 ? "tree-folder-inner tree-nested" : "tree-folder-inner";
+  inner.className = "tree-folder-inner tree-nested";
   folder.children.forEach((c) => {
     if (c.is_file) inner.appendChild(makeItem(c));
     else inner.appendChild(makeFolder(c, depth + 1));
